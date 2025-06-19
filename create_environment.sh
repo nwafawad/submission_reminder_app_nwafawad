@@ -93,4 +93,18 @@ EOF
 
 # 5. startup.sh
 cat << EOF > "${dir_name}/startup.sh"
-
+#!/bin/bash
+#making all shell scripts executable.
+echo "Setting execution permissions for all .sh files."
+# Find all files with the .sh extension
+# and grant execute permissions to the user.
+find . -type f -name "*.sh" -exec chmod u+x {} \;
+echo "Permissions updated successfully."
+echo "You can now run the main application using: ./app/reminder.sh"
+EOF
+#Make the startup script itself executable
+chmod +x "${dir_name}/startup.sh"
+echo ""
+echo "Setup complete!"
+echo "Navigate to your new directory: cd ${dir_name}"
+echo "Then, run the startup script to make all scripts executable: ./startup.sh"
