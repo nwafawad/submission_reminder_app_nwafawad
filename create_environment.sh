@@ -1,46 +1,39 @@
 #!/bin/bash
 
-# Prompt the user for their name
-read -p "Please enter your name to create the main directory: " userName
+# Prompt user for their name
+read -p "Please enter your name:  " userName 
 
-# Define the main directory name
-dir_name="submission_reminder_${userName}"
+# Create main directory (nested inside current directory)
+main_dir="./submission_reminder_${userName}"
+mkdir -p "$main_dir" || { echo "Error: Failed to create directory $main_dir"; exit 1; }
+echo "Created main directory: $main_dir"
 
-# Check if the directory already exists
-
- if [ -d "$dir_name" ]; then
-  echo "Directory '$dir_name' already exists. Please remove it or choose a different name."
+# Create subdirectories
+mkdir -p "$main_dir/app" "$main_dir/modules" "$main_dir/assets" "$main_dir/config" || {
+  echo "Error: Failed to create subdirectories"
   exit 1
-fi
+}
+echo "Created subdirectories: app, modules, assets, config"
 
-echo "Creating project structure in directory: ${dir_name}"
-
-# --- Create Directory Structure ---
-# The -p flag ensures that parent directories are created if they don't exist.
-mkdir -p "${dir_name}/app"
-mkdir -p "${dir_name}/assets"
-mkdir -p "${dir_name}/config"
-mkdir -p "${dir_name}/modules"
-
-echo "Directory structure created successfully."
-
-# Using 'touch' to create empty files first.
-touch "${dir_name}/startup.sh"
-touch "${dir_name}/app/reminder.sh"
-touch "${dir_name}/assets/submissions.txt"
-touch "${dir_name}/config/config.env"
-touch "${dir_name}/modules/functions.sh"
-
-# We use 'cat << EOF >' to write multi-line content into each file.
-# 1. config/config.env
-cat << EOF > "${dir_name}/config/config.env"
+# Create and populate config.env
+cat > "$main_dir/config/config.env" << 'EOF'
 # This is the config file
 ASSIGNMENT="Shell Navigation"
 DAYS_REMAINING=2
 EOF
+echo "config/config.env Created"
 
-# 2. modules/functions.sh
-cat << EOF > "${dir_name}/modules/functions.sh"
+# Create submissions.txt with provided records
+cat > "$main_dir/assets/submissions.txt" << 'EOF'
+student,assignment,submission status
+Chinemerem,Shell Navigation,not submitted
+Chiagoziem,Git,submitted
+Divine,Shell Navigation,not submitted
+EOF
+echo "Created assets/submissions.txt with 4 records"
+
+# Create functions.sh
+cat > "$main_dir/modules/functions.sh" << 'EOF'
 #!/bin/bash
 
 # Function to read submissions file and output students who have not submitted
@@ -62,26 +55,18 @@ function check_submissions {
     done < <(tail -n +2 "$submissions_file") # Skip the header
 }
 EOF
+echo "Created modules/functions.sh"
 
-# 3. assets/submissions.txt
-cat << EOF > "${dir_name}/assets/submissions.txt"
-student, assignment, submission status
-Chinemerem, Shell Navigation, not submitted
-Chiagoziem, Git, submitted
-Divine, Shell Navigation, not submitted
-Anissa, Shell Basics, submitted
-EOF
-
-# 4. app/reminder.sh
-cat << EOF > "${dir_name}/app/reminder.sh"
+# Create reminder.sh
+cat > "$main_dir/app/reminder.sh" << 'EOF'
 #!/bin/bash
 
 # Source environment variables and helper functions
-source ./config/config.env
-source ./modules/functions.sh
+source ../config/config.env
+source ../modules/functions.sh
 
 # Path to the submissions file
-submissions_file="./assets/submissions.txt"
+submissions_file="../assets/submissions.txt"
 
 # Print remaining time and run the reminder function
 echo "Assignment: $ASSIGNMENT"
@@ -90,21 +75,73 @@ echo "--------------------------------------------"
 
 check_submissions $submissions_file
 EOF
+echo "Created app/reminder.sh"
 
-# 5. startup.sh
-cat << EOF > "${dir_name}/startup.sh"
+# Create and populate startup.sh
+cat > "$main_dir/startup.sh" << 'EOF'
 #!/bin/bash
-#making all shell scripts executable.
-echo "Setting execution permissions for all .sh files."
-# Find all files with the .sh extension
-# and grant execute permissions to the user.
-find . -type f -name "*.sh" -exec chmod u+x {} \;
-echo "Permissions updated successfully."
-echo "You can now run the main application using: ./app/reminder.sh"
+
+# Startup script for submission reminder app
+echo "Starting Submission Reminder App..."
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Extract the parent directory name (e.g., submission_reminder_Nawaf)
+parent_dir_name=$(basename "$(dirname "$SCRIPT_DIR")")
+
+# Check if the parent directory matches submission_reminder_*
+if [[ "$parent_dir_name" == submission_reminder_* ]]; then
+  # Script is in the nested directory (e.g., /Users/Apple/submission_reminder_Nawaf/submission_reminder_John)
+  target_dir="$SCRIPT_DIR"
+else
+  # Script is in the base directory (e.g., /Users/Apple/submission_reminder_Nawaf)
+  # Look for a nested submission_reminder_* directory
+  nested_dirs=("$SCRIPT_DIR"/submission_reminder_*)
+  if [ -d "${nested_dirs[0]}" ] && [ "${#nested_dirs[@]}" -eq 1 ]; then
+    target_dir="${nested_dirs[0]}"
+  else
+    echo "Error: Could not find a single submission_reminder_* directory in $SCRIPT_DIR"
+    exit 1
+  fi
+fi
+
+# Check if the target directory exists
+if [ ! -d "$target_dir" ]; then
+  echo "Error: Directory $target_dir not found."
+  exit 1
+fi
+
+# Source configuration using absolute path
+if ! source "$target_dir/config/config.env"; then
+  echo "Error: Failed to source $target_dir/config/config.env"
+  exit 1
+fi
+
+# Change to the app directory using absolute path to ensure relative paths in reminder.sh work
+if ! cd "$target_dir/app"; then
+  echo "Error: Failed to change to $target_dir/app directory"
+  exit 1
+fi
+
+# Run the reminder script
+if ! bash ./reminder.sh; then
+  echo "Error: Failed to run reminder.sh"
+  exit 1
+fi
+
+echo "Submission Reminder App completed."
 EOF
-#Make the startup script itself executable
-chmod +x "${dir_name}/startup.sh"
-echo ""
-echo "Setup complete!"
-echo "Navigate to your new directory: cd ${dir_name}"
-echo "Then, run the startup script to make all scripts executable: ./startup.sh"
+echo "Created startup.sh"
+
+# Make all .sh files executable
+chmod +x "$main_dir/app/reminder.sh" "$main_dir/modules/functions.sh" "$main_dir/startup.sh" "$0"
+echo "Set executable permissions for all .sh files"
+
+# Test the application by running startup.sh
+echo "Testing the application by running startup.sh..."
+bash "$main_dir/startup.sh" || {
+  echo "Error: Failed to run startup.sh"
+  exit 1
+}
+echo "Environment setup completed successfully."
